@@ -1,11 +1,11 @@
-use serde::{Deserialize, Serialize};
+use rusqlite::{params, Connection};
+use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager};
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Todo {
     id: u32,
@@ -13,7 +13,7 @@ struct Todo {
     completed: bool,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkLog {
     id: u32,
@@ -21,34 +21,7 @@ struct WorkLog {
     created_at_ms: u64,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TodoStore {
-    todos: Vec<Todo>,
-    next_id: u32,
-}
-
-#[derive(Clone, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkLogStore {
-    work_logs: Vec<WorkLog>,
-    next_id: u32,
-}
-
-#[derive(Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PersistedData {
-    todo_store: TodoStore,
-    work_log_store: WorkLogStore,
-}
-
-#[derive(Default)]
-struct AppState {
-    todo_store: Mutex<TodoStore>,
-    work_log_store: Mutex<WorkLogStore>,
-}
-
-fn data_file_path(app: &AppHandle) -> Result<PathBuf, String> {
+fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -57,131 +30,123 @@ fn data_file_path(app: &AppHandle) -> Result<PathBuf, String> {
     fs::create_dir_all(&app_data_dir)
         .map_err(|error| format!("Failed to create app data directory: {error}"))?;
 
-    Ok(app_data_dir.join("data.json"))
+    Ok(app_data_dir)
 }
 
-fn load_state(app: &AppHandle, state: &AppState) -> Result<(), String> {
-    let path = data_file_path(app)?;
+fn database_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_data_dir(app)?.join("data.sqlite"))
+}
 
-    if !path.exists() {
-        return Ok(());
-    }
+fn open_database(app: &AppHandle) -> Result<Connection, String> {
+    let path = database_path(app)?;
 
-    let json =
-        fs::read_to_string(&path).map_err(|error| format!("Failed to read data file: {error}"))?;
-    let data: PersistedData = serde_json::from_str(&json)
-        .map_err(|error| format!("Failed to parse data file: {error}"))?;
+    Connection::open(path).map_err(|error| format!("Failed to open database: {error}"))
+}
 
-    *state
-        .todo_store
-        .lock()
-        .map_err(|_| "Todo store lock is poisoned.".to_string())? = data.todo_store;
+fn init_database(app: &AppHandle) -> Result<(), String> {
+    let connection = open_database(app)?;
 
-    *state
-        .work_log_store
-        .lock()
-        .map_err(|_| "Work log store lock is poisoned.".to_string())? = data.work_log_store;
+    connection
+        .execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS work_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                body TEXT NOT NULL,
+                created_at_ms INTEGER NOT NULL
+            );
+            ",
+        )
+        .map_err(|error| format!("Failed to initialize database: {error}"))?;
 
     Ok(())
 }
 
-fn save_state(app: &AppHandle, state: &AppState) -> Result<(), String> {
-    let todo_store = state
-        .todo_store
-        .lock()
-        .map_err(|_| "Todo store lock is poisoned.".to_string())?
-        .clone();
-    let work_log_store = state
-        .work_log_store
-        .lock()
-        .map_err(|_| "Work log store lock is poisoned.".to_string())?
-        .clone();
-
-    let data = PersistedData {
-        todo_store,
-        work_log_store,
-    };
-    let json = serde_json::to_string_pretty(&data)
-        .map_err(|error| format!("Failed to serialize data: {error}"))?;
-    let path = data_file_path(app)?;
-
-    fs::write(path, json).map_err(|error| format!("Failed to write data file: {error}"))?;
-
-    Ok(())
+fn row_id_to_u32(row_id: i64) -> Result<u32, String> {
+    u32::try_from(row_id).map_err(|_| format!("Database row id {row_id} is out of range."))
 }
 
 #[tauri::command]
-fn create_todo(title: &str, state: State<'_, AppState>, app: AppHandle) -> Result<Todo, String> {
+fn create_todo(title: &str, app: AppHandle) -> Result<Todo, String> {
     let title = title.trim();
 
     if title.is_empty() {
         return Err("Todo title is required.".to_string());
     }
 
-    let todo = {
-        let mut store = state
-            .todo_store
-            .lock()
-            .map_err(|_| "Todo store lock is poisoned.".to_string())?;
+    let connection = open_database(&app)?;
 
-        store.next_id += 1;
+    connection
+        .execute(
+            "INSERT INTO todos (title, completed) VALUES (?1, ?2)",
+            params![title, false],
+        )
+        .map_err(|error| format!("Failed to create todo: {error}"))?;
 
-        let todo = Todo {
-            id: store.next_id,
-            title: title.to_string(),
-            completed: false,
-        };
-
-        store.todos.push(todo.clone());
-
-        todo
-    };
-
-    save_state(&app, &state)?;
-
-    Ok(todo)
+    Ok(Todo {
+        id: row_id_to_u32(connection.last_insert_rowid())?,
+        title: title.to_string(),
+        completed: false,
+    })
 }
 
 #[tauri::command]
-fn list_todos(state: State<'_, AppState>) -> Result<Vec<Todo>, String> {
-    let store = state
-        .todo_store
-        .lock()
-        .map_err(|_| "Todo store lock is poisoned.".to_string())?;
+fn list_todos(app: AppHandle) -> Result<Vec<Todo>, String> {
+    let connection = open_database(&app)?;
+    let mut statement = connection
+        .prepare("SELECT id, title, completed FROM todos ORDER BY id ASC")
+        .map_err(|error| format!("Failed to prepare todo list query: {error}"))?;
+    let todos = statement
+        .query_map([], |row| {
+            Ok(Todo {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                completed: row.get(2)?,
+            })
+        })
+        .map_err(|error| format!("Failed to query todos: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Failed to read todos: {error}"))?;
 
-    Ok(store.todos.clone())
+    Ok(todos)
 }
 
 #[tauri::command]
-fn complete_todo(id: u32, state: State<'_, AppState>, app: AppHandle) -> Result<Todo, String> {
-    let completed_todo = {
-        let mut store = state
-            .todo_store
-            .lock()
-            .map_err(|_| "Todo store lock is poisoned.".to_string())?;
+fn complete_todo(id: u32, app: AppHandle) -> Result<Todo, String> {
+    let connection = open_database(&app)?;
+    let updated_rows = connection
+        .execute(
+            "UPDATE todos SET completed = ?1 WHERE id = ?2",
+            params![true, id],
+        )
+        .map_err(|error| format!("Failed to complete todo: {error}"))?;
 
-        let todo = store
-            .todos
-            .iter_mut()
-            .find(|todo| todo.id == id)
-            .ok_or_else(|| format!("Todo #{id} was not found."))?;
+    if updated_rows == 0 {
+        return Err(format!("Todo #{id} was not found."));
+    }
 
-        todo.completed = true;
-
-        todo.clone()
-    };
-
-    save_state(&app, &state)?;
-
-    Ok(completed_todo)
+    connection
+        .query_row(
+            "SELECT id, title, completed FROM todos WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(Todo {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    completed: row.get(2)?,
+                })
+            },
+        )
+        .map_err(|error| format!("Failed to read completed todo: {error}"))
 }
 
 #[tauri::command]
-fn create_work_log(
-    body: &str,
-    state: State<'_, AppState>,
-    app: AppHandle,
-) -> Result<WorkLog, String> {
+fn create_work_log(body: &str, app: AppHandle) -> Result<WorkLog, String> {
     let body = body.trim();
 
     if body.is_empty() {
@@ -193,49 +158,49 @@ fn create_work_log(
         .map_err(|_| "System time is before Unix epoch.".to_string())?
         .as_millis() as u64;
 
-    let work_log = {
-        let mut store = state
-            .work_log_store
-            .lock()
-            .map_err(|_| "Work log store lock is poisoned.".to_string())?;
+    let connection = open_database(&app)?;
 
-        store.next_id += 1;
+    connection
+        .execute(
+            "INSERT INTO work_logs (body, created_at_ms) VALUES (?1, ?2)",
+            params![body, created_at_ms],
+        )
+        .map_err(|error| format!("Failed to create work log: {error}"))?;
 
-        let work_log = WorkLog {
-            id: store.next_id,
-            body: body.to_string(),
-            created_at_ms,
-        };
-
-        store.work_logs.push(work_log.clone());
-
-        work_log
-    };
-
-    save_state(&app, &state)?;
-
-    Ok(work_log)
+    Ok(WorkLog {
+        id: row_id_to_u32(connection.last_insert_rowid())?,
+        body: body.to_string(),
+        created_at_ms,
+    })
 }
 
 #[tauri::command]
-fn list_work_logs(state: State<'_, AppState>) -> Result<Vec<WorkLog>, String> {
-    let store = state
-        .work_log_store
-        .lock()
-        .map_err(|_| "Work log store lock is poisoned.".to_string())?;
+fn list_work_logs(app: AppHandle) -> Result<Vec<WorkLog>, String> {
+    let connection = open_database(&app)?;
+    let mut statement = connection
+        .prepare("SELECT id, body, created_at_ms FROM work_logs ORDER BY id DESC")
+        .map_err(|error| format!("Failed to prepare work log list query: {error}"))?;
+    let work_logs = statement
+        .query_map([], |row| {
+            Ok(WorkLog {
+                id: row.get(0)?,
+                body: row.get(1)?,
+                created_at_ms: row.get(2)?,
+            })
+        })
+        .map_err(|error| format!("Failed to query work logs: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Failed to read work logs: {error}"))?;
 
-    Ok(store.work_logs.clone())
+    Ok(work_logs)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(AppState::default())
         .setup(|app| {
-            let state = app.state::<AppState>();
-
-            if let Err(error) = load_state(app.handle(), &state) {
-                eprintln!("Failed to load persisted data: {error}");
+            if let Err(error) = init_database(app.handle()) {
+                eprintln!("Failed to initialize database: {error}");
             }
 
             Ok(())
