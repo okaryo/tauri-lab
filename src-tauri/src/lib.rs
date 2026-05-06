@@ -44,9 +44,28 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
 }
 
 fn init_database(app: &AppHandle) -> Result<(), String> {
-    let connection = open_database(app)?;
+    let mut connection = open_database(app)?;
+    let version = current_schema_version(&connection)?;
 
+    if version < 1 {
+        migrate_to_v1(&mut connection)?;
+    }
+
+    Ok(())
+}
+
+fn current_schema_version(connection: &Connection) -> Result<u32, String> {
     connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|error| format!("Failed to read schema version: {error}"))
+}
+
+fn migrate_to_v1(connection: &mut Connection) -> Result<(), String> {
+    let transaction = connection
+        .transaction()
+        .map_err(|error| format!("Failed to start migration v1: {error}"))?;
+
+    transaction
         .execute_batch(
             "
             CREATE TABLE IF NOT EXISTS todos (
@@ -60,9 +79,15 @@ fn init_database(app: &AppHandle) -> Result<(), String> {
                 body TEXT NOT NULL,
                 created_at_ms INTEGER NOT NULL
             );
+
+            PRAGMA user_version = 1;
             ",
         )
-        .map_err(|error| format!("Failed to initialize database: {error}"))?;
+        .map_err(|error| format!("Failed to apply migration v1: {error}"))?;
+
+    transaction
+        .commit()
+        .map_err(|error| format!("Failed to commit migration v1: {error}"))?;
 
     Ok(())
 }
