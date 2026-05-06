@@ -11,7 +11,11 @@
     listWorkLogs,
     type WorkLog,
   } from "./lib/api/workLogs";
-  import { sendTestNotification as sendTestNotificationCommand } from "./lib/desktop/notifications";
+  import {
+    sendAppNotification,
+    sendTestNotification as sendTestNotificationCommand,
+    type NotificationPermissionStatus,
+  } from "./lib/desktop/notifications";
   import {
     registerWorkLogShortcut as registerWorkLogShortcutCommand,
     unregisterWorkLogShortcut as unregisterWorkLogShortcutCommand,
@@ -30,7 +34,7 @@
   let workLogBody = "";
   let workLogs: WorkLog[] = [];
   let workLogErrorMessage = "";
-  let notificationStatus = "Not checked";
+  let notificationStatus: NotificationPermissionStatus | "Not checked" = "Not checked";
   let notificationErrorMessage = "";
   let shortcutRegistered = false;
   let shortcutTriggerCount = 0;
@@ -196,9 +200,25 @@
       return;
     }
 
+    const completedMode = pomodoroMode;
     const nextMode: PomodoroMode = pomodoroMode === "work" ? "break" : "work";
     pomodoroMode = nextMode;
     remainingSeconds = nextMode === "work" ? workDurationSeconds : breakDurationSeconds;
+    void notifyTimerComplete(completedMode, nextMode);
+  }
+
+  async function notifyTimerComplete(completedMode: PomodoroMode, nextMode: PomodoroMode) {
+    notificationErrorMessage = "";
+
+    const title = completedMode === "work" ? "Work session complete" : "Break complete";
+    const body =
+      nextMode === "break" ? "Time to take a short break." : "Time to start the next work session.";
+
+    try {
+      notificationStatus = await sendAppNotification(title, body);
+    } catch (error) {
+      notificationErrorMessage = error instanceof Error ? error.message : String(error);
+    }
   }
 
   function formatDuration(totalSeconds: number) {

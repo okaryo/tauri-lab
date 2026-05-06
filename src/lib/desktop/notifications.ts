@@ -6,7 +6,7 @@ import {
 
 export type NotificationPermissionStatus = "Granted" | "Denied";
 
-export async function sendTestNotification(): Promise<NotificationPermissionStatus> {
+async function ensureNotificationPermission(): Promise<NotificationPermissionStatus> {
   let permissionGranted = await isPermissionGranted();
 
   if (!permissionGranted) {
@@ -18,10 +18,27 @@ export async function sendTestNotification(): Promise<NotificationPermissionStat
     return "Denied";
   }
 
+  return "Granted";
+}
+
+export async function sendAppNotification(
+  title: string,
+  body: string,
+): Promise<NotificationPermissionStatus> {
+  const permissionStatus = await ensureNotificationPermission();
+
+  if (permissionStatus === "Denied") {
+    return permissionStatus;
+  }
+
   sendNotification({
-    title: "tauri-lab",
-    body: "Notification plugin is ready.",
+    title,
+    body,
   });
 
-  return "Granted";
+  return permissionStatus;
+}
+
+export function sendTestNotification(): Promise<NotificationPermissionStatus> {
+  return sendAppNotification("tauri-lab", "Notification plugin is ready.");
 }
