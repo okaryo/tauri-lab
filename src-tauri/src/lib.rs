@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
 
 #[derive(Clone, Serialize)]
@@ -10,6 +11,14 @@ struct Todo {
     completed: bool,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkLog {
+    id: u32,
+    body: String,
+    created_at_ms: u64,
+}
+
 #[derive(Default)]
 struct TodoStore {
     todos: Vec<Todo>,
@@ -17,8 +26,15 @@ struct TodoStore {
 }
 
 #[derive(Default)]
+struct WorkLogStore {
+    work_logs: Vec<WorkLog>,
+    next_id: u32,
+}
+
+#[derive(Default)]
 struct AppState {
     todo_store: Mutex<TodoStore>,
+    work_log_store: Mutex<WorkLogStore>,
 }
 
 #[tauri::command]
@@ -75,6 +91,47 @@ fn complete_todo(id: u32, state: State<'_, AppState>) -> Result<Todo, String> {
     Ok(todo.clone())
 }
 
+#[tauri::command]
+fn create_work_log(body: &str, state: State<'_, AppState>) -> Result<WorkLog, String> {
+    let body = body.trim();
+
+    if body.is_empty() {
+        return Err("Work log body is required.".to_string());
+    }
+
+    let created_at_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| "System time is before Unix epoch.".to_string())?
+        .as_millis() as u64;
+
+    let mut store = state
+        .work_log_store
+        .lock()
+        .map_err(|_| "Work log store lock is poisoned.".to_string())?;
+
+    store.next_id += 1;
+
+    let work_log = WorkLog {
+        id: store.next_id,
+        body: body.to_string(),
+        created_at_ms,
+    };
+
+    store.work_logs.push(work_log.clone());
+
+    Ok(work_log)
+}
+
+#[tauri::command]
+fn list_work_logs(state: State<'_, AppState>) -> Result<Vec<WorkLog>, String> {
+    let store = state
+        .work_log_store
+        .lock()
+        .map_err(|_| "Work log store lock is poisoned.".to_string())?;
+
+    Ok(store.work_logs.clone())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -82,7 +139,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             create_todo,
             list_todos,
-            complete_todo
+            complete_todo,
+            create_work_log,
+            list_work_logs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

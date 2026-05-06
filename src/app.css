@@ -17,7 +17,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -47,7 +48,8 @@ p {
   color: #4d545c;
 }
 
-.todo-form {
+.todo-form,
+.work-log-form {
   display: grid;
   gap: 10px;
 }
@@ -64,6 +66,17 @@ label {
 input {
   min-width: 0;
   flex: 1;
+  border: 1px solid #bbb3a7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fffdfa;
+  color: #202124;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
   border: 1px solid #bbb3a7;
   border-radius: 6px;
   padding: 10px 12px;
@@ -106,11 +119,13 @@ button.secondary:hover:not(:disabled) {
   color: #a33a2a;
 }
 
-.todo-section {
+.todo-section,
+.work-log-section {
   margin-top: 40px;
 }
 
-.todo-list {
+.todo-list,
+.work-log-list {
   display: grid;
   gap: 8px;
   padding: 0;
@@ -118,7 +133,8 @@ button.secondary:hover:not(:disabled) {
   list-style: none;
 }
 
-.todo-list li {
+.todo-list li,
+.work-log-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -127,6 +143,16 @@ button.secondary:hover:not(:disabled) {
   border-radius: 6px;
   padding: 10px 12px;
   background: #fffdfa;
+}
+
+.work-log-list li {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.work-log-list p {
+  color: #202124;
+  white-space: pre-wrap;
 }
 
 .todo-list li.completed span {
@@ -140,7 +166,8 @@ button.secondary:hover:not(:disabled) {
   gap: 10px;
 }
 
-.todo-list small {
+.todo-list small,
+.work-log-list small {
   color: #687078;
 }
 

@@ -8,12 +8,22 @@
     completed: boolean;
   };
 
+  type WorkLog = {
+    id: number;
+    body: string;
+    createdAtMs: number;
+  };
+
   let todoTitle = "";
   let todos: Todo[] = [];
   let todoErrorMessage = "";
+  let workLogBody = "";
+  let workLogs: WorkLog[] = [];
+  let workLogErrorMessage = "";
 
   onMount(() => {
     void loadTodos();
+    void loadWorkLogs();
   });
 
   async function loadTodos() {
@@ -47,6 +57,35 @@
     } catch (error) {
       todoErrorMessage = error instanceof Error ? error.message : String(error);
     }
+  }
+
+  async function loadWorkLogs() {
+    workLogErrorMessage = "";
+
+    try {
+      workLogs = await invoke<WorkLog[]>("list_work_logs");
+    } catch (error) {
+      workLogErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function createWorkLog() {
+    workLogErrorMessage = "";
+
+    try {
+      const workLog = await invoke<WorkLog>("create_work_log", { body: workLogBody });
+      workLogs = [workLog, ...workLogs];
+      workLogBody = "";
+    } catch (error) {
+      workLogErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  function formatTimestamp(timestampMs: number) {
+    return new Intl.DateTimeFormat("ja-JP", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(timestampMs));
   }
 </script>
 
@@ -92,6 +131,38 @@
       </ul>
     {:else}
       <p class="empty">No todos yet.</p>
+    {/if}
+  </section>
+
+  <section class="work-log-section" aria-labelledby="work-log-heading">
+    <h2 id="work-log-heading">Work Log</h2>
+
+    <form class="work-log-form" on:submit|preventDefault={createWorkLog}>
+      <label for="work-log-body">Body</label>
+      <textarea
+        id="work-log-body"
+        bind:value={workLogBody}
+        rows="4"
+        placeholder="Write what you worked on"
+      ></textarea>
+      <button type="submit">Add log</button>
+    </form>
+
+    {#if workLogErrorMessage}
+      <p class="error">{workLogErrorMessage}</p>
+    {/if}
+
+    {#if workLogs.length > 0}
+      <ul class="work-log-list">
+        {#each workLogs as workLog (workLog.id)}
+          <li>
+            <p>{workLog.body}</p>
+            <small>{formatTimestamp(workLog.createdAtMs)} / #{workLog.id}</small>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="empty">No work logs yet.</p>
     {/if}
   </section>
 </main>
