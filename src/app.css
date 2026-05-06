@@ -18,6 +18,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -74,6 +75,15 @@ input {
   color: #202124;
 }
 
+select {
+  min-width: 0;
+  border: 1px solid #bbb3a7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fffdfa;
+  color: #202124;
+}
+
 textarea {
   width: 100%;
   box-sizing: border-box;
@@ -123,6 +133,7 @@ button.secondary:hover:not(:disabled) {
 .todo-section,
 .pomodoro-section,
 .settings-section,
+.ambient-section,
 .work-log-section,
 .notification-section,
 .shortcut-section {
@@ -131,6 +142,7 @@ button.secondary:hover:not(:disabled) {
 
 .notification-section,
 .settings-section,
+.ambient-section,
 .shortcut-section {
   display: grid;
   gap: 12px;
@@ -138,6 +150,7 @@ button.secondary:hover:not(:disabled) {
 
 .notification-section button,
 .settings-section button,
+.ambient-section button,
 .shortcut-section button {
   justify-self: start;
 }
@@ -172,6 +185,7 @@ button.secondary:hover:not(:disabled) {
   gap: 8px;
 }
 
+.ambient-panel,
 .timer-panel {
   display: grid;
   gap: 12px;

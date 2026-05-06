@@ -26,6 +26,10 @@
     unregisterWorkLogShortcut as unregisterWorkLogShortcutCommand,
     workLogShortcut,
   } from "./lib/desktop/globalShortcuts";
+  import {
+    AmbientSoundPlayer,
+    type AmbientSoundKind,
+  } from "./lib/audio/ambientSound";
 
   const defaultWorkDurationMinutes = 25;
   const defaultBreakDurationMinutes = 5;
@@ -56,6 +60,12 @@
   let timerStatus: TimerStatus = "idle";
   let remainingSeconds = durationForMode("work");
   let timerId: ReturnType<typeof setInterval> | null = null;
+  const ambientSoundPlayer = new AmbientSoundPlayer();
+  let ambientSoundKind: AmbientSoundKind = "rain";
+  let ambientSoundVolume = 0.35;
+  let ambientSoundPlaying = false;
+  let ambientSoundFollowsTimer = true;
+  let ambientSoundErrorMessage = "";
 
   onMount(() => {
     void loadTodos();
@@ -69,6 +79,7 @@
     }
 
     stopTimer();
+    stopAmbientSound();
   });
 
   $: timerProgress =
@@ -182,11 +193,19 @@
 
     timerStatus = "running";
     timerId = setInterval(tickTimer, 1000);
+
+    if (ambientSoundFollowsTimer) {
+      void startAmbientSound();
+    }
   }
 
   function pauseTimer() {
     stopTimer();
     timerStatus = "paused";
+
+    if (ambientSoundFollowsTimer) {
+      stopAmbientSound();
+    }
   }
 
   function resetTimer() {
@@ -194,6 +213,10 @@
     timerStatus = "idle";
     pomodoroMode = "work";
     remainingSeconds = durationForMode("work");
+
+    if (ambientSoundFollowsTimer) {
+      stopAmbientSound();
+    }
   }
 
   function stopTimer() {
@@ -289,6 +312,27 @@
     draftWorkDurationMinutes = settings.workDurationMinutes;
     draftBreakDurationMinutes = settings.breakDurationMinutes;
     draftTimerNotificationsEnabled = settings.timerNotificationsEnabled;
+  }
+
+  async function startAmbientSound() {
+    ambientSoundErrorMessage = "";
+
+    try {
+      await ambientSoundPlayer.start(ambientSoundKind, ambientSoundVolume);
+      ambientSoundPlaying = true;
+    } catch (error) {
+      ambientSoundPlaying = false;
+      ambientSoundErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  function stopAmbientSound() {
+    ambientSoundPlayer.stop();
+    ambientSoundPlaying = false;
+  }
+
+  function updateAmbientSoundVolume() {
+    ambientSoundPlayer.setVolume(ambientSoundVolume);
   }
 
   function formatDuration(totalSeconds: number) {
@@ -418,6 +462,62 @@
         <p class="error">{settingsErrorMessage}</p>
       {/if}
     </form>
+  </section>
+
+  <section class="ambient-section" aria-labelledby="ambient-heading">
+    <h2 id="ambient-heading">Ambient Sound</h2>
+
+    <div class="ambient-panel">
+      <label class="settings-field" for="ambient-kind">
+        Sound
+        <select id="ambient-kind" bind:value={ambientSoundKind} disabled={ambientSoundPlaying}>
+          <option value="rain">Rain</option>
+          <option value="wind">Wind</option>
+        </select>
+      </label>
+
+      <label class="settings-field" for="ambient-volume">
+        Volume
+        <input
+          id="ambient-volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          bind:value={ambientSoundVolume}
+          on:input={updateAmbientSoundVolume}
+        />
+      </label>
+
+      <label class="checkbox-row" for="ambient-follows-timer">
+        <input
+          id="ambient-follows-timer"
+          type="checkbox"
+          bind:checked={ambientSoundFollowsTimer}
+        />
+        Play while timer is running
+      </label>
+
+      <div class="button-row">
+        <button type="button" on:click={startAmbientSound} disabled={ambientSoundPlaying}>
+          Play
+        </button>
+        <button
+          type="button"
+          class="secondary"
+          on:click={stopAmbientSound}
+          disabled={!ambientSoundPlaying}
+        >
+          Stop
+        </button>
+      </div>
+
+      <small>Status: {ambientSoundPlaying ? "playing" : "stopped"}</small>
+
+      {#if ambientSoundErrorMessage}
+        <p class="error">{ambientSoundErrorMessage}</p>
+      {/if}
+    </div>
   </section>
 
   <section class="work-log-section" aria-labelledby="work-log-heading">
