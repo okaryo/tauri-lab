@@ -47,7 +47,6 @@ p {
   color: #4d545c;
 }
 
-.greet-form,
 .todo-form {
   display: grid;
   gap: 10px;
@@ -101,37 +100,6 @@ button.secondary:hover:not(:disabled) {
   background: #d8d0c4;
 }
 
-.greeting {
-  margin-top: 20px;
-  font-weight: 700;
-  color: #1f6f43;
-}
-
-.greeting p {
-  color: inherit;
-}
-
-.greeting dl {
-  display: flex;
-  gap: 16px;
-  margin: 12px 0 0;
-}
-
-.greeting div {
-  display: grid;
-  gap: 4px;
-}
-
-.greeting dt {
-  color: #4d545c;
-  font-size: 13px;
-}
-
-.greeting dd {
-  margin: 0;
-  color: #202124;
-}
-
 .error {
   margin-top: 20px;
   font-weight: 700;
@@ -139,9 +107,7 @@ button.secondary:hover:not(:disabled) {
 }
 
 .todo-section {
-  margin-top: 48px;
-  padding-top: 32px;
-  border-top: 1px solid #d8d0c4;
+  margin-top: 40px;
 }
 
 .todo-list {

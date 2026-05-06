@@ -2,20 +2,12 @@
   import { invoke } from "@tauri-apps/api/core";
   import { onMount } from "svelte";
 
-  type Greeting = {
-    message: string;
-    nameLength: number;
-  };
-
   type Todo = {
     id: number;
     title: string;
     completed: boolean;
   };
 
-  let name = "";
-  let greeting: Greeting | null = null;
-  let errorMessage = "";
   let todoTitle = "";
   let todos: Todo[] = [];
   let todoErrorMessage = "";
@@ -23,17 +15,6 @@
   onMount(() => {
     void loadTodos();
   });
-
-  async function greet() {
-    greeting = null;
-    errorMessage = "";
-
-    try {
-      greeting = await invoke<Greeting>("greet", { name });
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : String(error);
-    }
-  }
 
   async function loadTodos() {
     todoErrorMessage = "";
@@ -72,32 +53,8 @@
 <main class="container">
   <section class="intro">
     <h1>Tauri + Svelte</h1>
-    <p>Frontend は Svelte、デスクトップ側の処理は Rust で動く最小構成です。</p>
+    <p>Todo の操作を通して、Svelte から Rust command を呼ぶ流れを練習します。</p>
   </section>
-
-  <form class="greet-form" on:submit|preventDefault={greet}>
-    <label for="name">Name</label>
-    <div class="row">
-      <input id="name" bind:value={name} placeholder="Enter a name" />
-      <button type="submit">Greet</button>
-    </div>
-  </form>
-
-  {#if greeting}
-    <section class="greeting" aria-label="Greeting from Rust">
-      <p>{greeting.message}</p>
-      <dl>
-        <div>
-          <dt>Name length</dt>
-          <dd>{greeting.nameLength}</dd>
-        </div>
-      </dl>
-    </section>
-  {/if}
-
-  {#if errorMessage}
-    <p class="error">{errorMessage}</p>
-  {/if}
 
   <section class="todo-section" aria-labelledby="todo-heading">
     <h2 id="todo-heading">Todo</h2>
