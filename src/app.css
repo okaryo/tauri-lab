@@ -49,7 +49,8 @@ p {
 }
 
 .todo-form,
-.work-log-form {
+.work-log-form,
+.settings-form {
   display: grid;
   gap: 10px;
 }
@@ -121,6 +122,7 @@ button.secondary:hover:not(:disabled) {
 
 .todo-section,
 .pomodoro-section,
+.settings-section,
 .work-log-section,
 .notification-section,
 .shortcut-section {
@@ -128,14 +130,40 @@ button.secondary:hover:not(:disabled) {
 }
 
 .notification-section,
+.settings-section,
 .shortcut-section {
   display: grid;
   gap: 12px;
 }
 
 .notification-section button,
+.settings-section button,
 .shortcut-section button {
   justify-self: start;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.checkbox-row input {
+  flex: none;
+  width: 18px;
+  height: 18px;
 }
 
 .button-row {
