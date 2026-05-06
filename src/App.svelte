@@ -1,24 +1,22 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
-  import {
-    isPermissionGranted,
-    requestPermission,
-    sendNotification,
-  } from "@tauri-apps/plugin-notification";
-  import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
   import { onDestroy, onMount } from "svelte";
-
-  type Todo = {
-    id: number;
-    title: string;
-    completed: boolean;
-  };
-
-  type WorkLog = {
-    id: number;
-    body: string;
-    createdAtMs: number;
-  };
+  import {
+    completeTodo as completeTodoCommand,
+    createTodo as createTodoCommand,
+    listTodos,
+    type Todo,
+  } from "./lib/api/todos";
+  import {
+    createWorkLog as createWorkLogCommand,
+    listWorkLogs,
+    type WorkLog,
+  } from "./lib/api/workLogs";
+  import { sendTestNotification as sendTestNotificationCommand } from "./lib/desktop/notifications";
+  import {
+    registerWorkLogShortcut as registerWorkLogShortcutCommand,
+    unregisterWorkLogShortcut as unregisterWorkLogShortcutCommand,
+    workLogShortcut,
+  } from "./lib/desktop/globalShortcuts";
 
   let todoTitle = "";
   let todos: Todo[] = [];
@@ -28,7 +26,6 @@
   let workLogErrorMessage = "";
   let notificationStatus = "Not checked";
   let notificationErrorMessage = "";
-  const workLogShortcut = "CommandOrControl+Shift+L";
   let shortcutRegistered = false;
   let shortcutTriggerCount = 0;
   let shortcutStatus = "Not registered";
@@ -41,7 +38,7 @@
 
   onDestroy(() => {
     if (shortcutRegistered) {
-      void unregister(workLogShortcut);
+      void unregisterWorkLogShortcutCommand();
     }
   });
 
@@ -49,7 +46,7 @@
     todoErrorMessage = "";
 
     try {
-      todos = await invoke<Todo[]>("list_todos");
+      todos = await listTodos();
     } catch (error) {
       todoErrorMessage = error instanceof Error ? error.message : String(error);
     }
@@ -59,7 +56,7 @@
     todoErrorMessage = "";
 
     try {
-      const todo = await invoke<Todo>("create_todo", { title: todoTitle });
+      const todo = await createTodoCommand(todoTitle);
       todos = [...todos, todo];
       todoTitle = "";
     } catch (error) {
@@ -71,7 +68,7 @@
     todoErrorMessage = "";
 
     try {
-      const completedTodo = await invoke<Todo>("complete_todo", { id });
+      const completedTodo = await completeTodoCommand(id);
       todos = todos.map((todo) => (todo.id === id ? completedTodo : todo));
     } catch (error) {
       todoErrorMessage = error instanceof Error ? error.message : String(error);
@@ -82,7 +79,7 @@
     workLogErrorMessage = "";
 
     try {
-      workLogs = await invoke<WorkLog[]>("list_work_logs");
+      workLogs = await listWorkLogs();
     } catch (error) {
       workLogErrorMessage = error instanceof Error ? error.message : String(error);
     }
@@ -92,7 +89,7 @@
     workLogErrorMessage = "";
 
     try {
-      const workLog = await invoke<WorkLog>("create_work_log", { body: workLogBody });
+      const workLog = await createWorkLogCommand(workLogBody);
       workLogs = [workLog, ...workLogs];
       workLogBody = "";
     } catch (error) {
@@ -111,23 +108,7 @@
     notificationErrorMessage = "";
 
     try {
-      let permissionGranted = await isPermissionGranted();
-
-      if (!permissionGranted) {
-        const permission = await requestPermission();
-        permissionGranted = permission === "granted";
-      }
-
-      notificationStatus = permissionGranted ? "Granted" : "Denied";
-
-      if (!permissionGranted) {
-        return;
-      }
-
-      sendNotification({
-        title: "tauri-lab",
-        body: "Notification plugin is ready.",
-      });
+      notificationStatus = await sendTestNotificationCommand();
     } catch (error) {
       notificationErrorMessage = error instanceof Error ? error.message : String(error);
     }
@@ -137,23 +118,12 @@
     shortcutErrorMessage = "";
 
     try {
-      if (await isRegistered(workLogShortcut)) {
-        shortcutRegistered = true;
-        shortcutStatus = "Registered";
-        return;
-      }
-
-      await register(workLogShortcut, (event) => {
-        if (event.state !== "Pressed") {
-          return;
-        }
-
+      await registerWorkLogShortcutCommand(() => {
         shortcutTriggerCount += 1;
         shortcutStatus = `Triggered ${shortcutTriggerCount} time${
           shortcutTriggerCount === 1 ? "" : "s"
         }`;
       });
-
       shortcutRegistered = true;
       shortcutStatus = "Registered";
     } catch (error) {
@@ -165,7 +135,7 @@
     shortcutErrorMessage = "";
 
     try {
-      await unregister(workLogShortcut);
+      await unregisterWorkLogShortcutCommand();
       shortcutRegistered = false;
       shortcutStatus = "Not registered";
     } catch (error) {
