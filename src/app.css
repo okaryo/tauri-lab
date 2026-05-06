@@ -120,8 +120,18 @@ button.secondary:hover:not(:disabled) {
 }
 
 .todo-section,
-.work-log-section {
+.work-log-section,
+.notification-section {
   margin-top: 40px;
+}
+
+.notification-section {
+  display: grid;
+  gap: 12px;
+}
+
+.notification-section button {
+  justify-self: start;
 }
 
 .todo-list,

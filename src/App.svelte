@@ -1,5 +1,10 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import {
+    isPermissionGranted,
+    requestPermission,
+    sendNotification,
+  } from "@tauri-apps/plugin-notification";
   import { onMount } from "svelte";
 
   type Todo = {
@@ -20,6 +25,8 @@
   let workLogBody = "";
   let workLogs: WorkLog[] = [];
   let workLogErrorMessage = "";
+  let notificationStatus = "Not checked";
+  let notificationErrorMessage = "";
 
   onMount(() => {
     void loadTodos();
@@ -86,6 +93,32 @@
       dateStyle: "short",
       timeStyle: "short",
     }).format(new Date(timestampMs));
+  }
+
+  async function sendTestNotification() {
+    notificationErrorMessage = "";
+
+    try {
+      let permissionGranted = await isPermissionGranted();
+
+      if (!permissionGranted) {
+        const permission = await requestPermission();
+        permissionGranted = permission === "granted";
+      }
+
+      notificationStatus = permissionGranted ? "Granted" : "Denied";
+
+      if (!permissionGranted) {
+        return;
+      }
+
+      sendNotification({
+        title: "tauri-lab",
+        body: "Notification plugin is ready.",
+      });
+    } catch (error) {
+      notificationErrorMessage = error instanceof Error ? error.message : String(error);
+    }
   }
 </script>
 
@@ -163,6 +196,16 @@
       </ul>
     {:else}
       <p class="empty">No work logs yet.</p>
+    {/if}
+  </section>
+
+  <section class="notification-section" aria-labelledby="notification-heading">
+    <h2 id="notification-heading">Notification</h2>
+    <p>Permission: {notificationStatus}</p>
+    <button type="button" on:click={sendTestNotification}>Send test notification</button>
+
+    {#if notificationErrorMessage}
+      <p class="error">{notificationErrorMessage}</p>
     {/if}
   </section>
 </main>
