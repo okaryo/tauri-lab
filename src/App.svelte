@@ -12,6 +12,11 @@
     type WorkLog,
   } from "./lib/api/workLogs";
   import {
+    loadAppSettings,
+    saveAppSettings,
+    type AppSettings,
+  } from "./lib/api/settings";
+  import {
     sendAppNotification,
     sendTestNotification as sendTestNotificationCommand,
     type NotificationPermissionStatus,
@@ -55,6 +60,7 @@
   onMount(() => {
     void loadTodos();
     void loadWorkLogs();
+    void restoreAppSettings();
   });
 
   onDestroy(() => {
@@ -230,7 +236,7 @@
     }
   }
 
-  function applyTimerSettings() {
+  async function applyTimerSettings() {
     settingsErrorMessage = "";
 
     if (!isValidDurationMinutes(draftWorkDurationMinutes)) {
@@ -243,10 +249,18 @@
       return;
     }
 
-    workDurationMinutes = draftWorkDurationMinutes;
-    breakDurationMinutes = draftBreakDurationMinutes;
-    timerNotificationsEnabled = draftTimerNotificationsEnabled;
-    resetTimer();
+    try {
+      applyAppSettings(
+        await saveAppSettings({
+          workDurationMinutes: draftWorkDurationMinutes,
+          breakDurationMinutes: draftBreakDurationMinutes,
+          timerNotificationsEnabled: draftTimerNotificationsEnabled,
+        }),
+      );
+      resetTimer();
+    } catch (error) {
+      settingsErrorMessage = error instanceof Error ? error.message : String(error);
+    }
   }
 
   function isValidDurationMinutes(value: number) {
@@ -255,6 +269,26 @@
 
   function durationForMode(mode: PomodoroMode) {
     return (mode === "work" ? workDurationMinutes : breakDurationMinutes) * 60;
+  }
+
+  async function restoreAppSettings() {
+    settingsErrorMessage = "";
+
+    try {
+      applyAppSettings(await loadAppSettings());
+      resetTimer();
+    } catch (error) {
+      settingsErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  function applyAppSettings(settings: AppSettings) {
+    workDurationMinutes = settings.workDurationMinutes;
+    breakDurationMinutes = settings.breakDurationMinutes;
+    timerNotificationsEnabled = settings.timerNotificationsEnabled;
+    draftWorkDurationMinutes = settings.workDurationMinutes;
+    draftBreakDurationMinutes = settings.breakDurationMinutes;
+    draftTimerNotificationsEnabled = settings.timerNotificationsEnabled;
   }
 
   function formatDuration(totalSeconds: number) {

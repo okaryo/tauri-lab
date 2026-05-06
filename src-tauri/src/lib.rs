@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -21,6 +21,24 @@ struct WorkLog {
     created_at_ms: u64,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppSettings {
+    work_duration_minutes: u32,
+    break_duration_minutes: u32,
+    timer_notifications_enabled: bool,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            work_duration_minutes: 25,
+            break_duration_minutes: 5,
+            timer_notifications_enabled: true,
+        }
+    }
+}
+
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -35,6 +53,10 @@ fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
 
 fn database_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("data.sqlite"))
+}
+
+fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_data_dir(app)?.join("settings.json"))
 }
 
 fn open_database(app: &AppHandle) -> Result<Connection, String> {
@@ -94,6 +116,19 @@ fn migrate_to_v1(connection: &mut Connection) -> Result<(), String> {
 
 fn row_id_to_u32(row_id: i64) -> Result<u32, String> {
     u32::try_from(row_id).map_err(|_| format!("Database row id {row_id} is out of range."))
+}
+
+fn validate_app_settings(settings: &AppSettings) -> Result<(), String> {
+    validate_duration_minutes("Work duration", settings.work_duration_minutes)?;
+    validate_duration_minutes("Break duration", settings.break_duration_minutes)
+}
+
+fn validate_duration_minutes(label: &str, value: u32) -> Result<(), String> {
+    if (1..=180).contains(&value) {
+        return Ok(());
+    }
+
+    Err(format!("{label} must be between 1 and 180 minutes."))
 }
 
 #[tauri::command]
@@ -220,6 +255,37 @@ fn list_work_logs(app: AppHandle) -> Result<Vec<WorkLog>, String> {
     Ok(work_logs)
 }
 
+#[tauri::command]
+fn load_app_settings(app: AppHandle) -> Result<AppSettings, String> {
+    let path = settings_path(&app)?;
+
+    if !path.exists() {
+        return Ok(AppSettings::default());
+    }
+
+    let content =
+        fs::read_to_string(path).map_err(|error| format!("Failed to read settings: {error}"))?;
+    let settings: AppSettings = serde_json::from_str(&content)
+        .map_err(|error| format!("Failed to parse settings: {error}"))?;
+
+    validate_app_settings(&settings)?;
+
+    Ok(settings)
+}
+
+#[tauri::command]
+fn save_app_settings(settings: AppSettings, app: AppHandle) -> Result<AppSettings, String> {
+    validate_app_settings(&settings)?;
+
+    let path = settings_path(&app)?;
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|error| format!("Failed to serialize settings: {error}"))?;
+
+    fs::write(path, content).map_err(|error| format!("Failed to write settings: {error}"))?;
+
+    Ok(settings)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -240,7 +306,9 @@ pub fn run() {
             list_todos,
             complete_todo,
             create_work_log,
-            list_work_logs
+            list_work_logs,
+            load_app_settings,
+            save_app_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
