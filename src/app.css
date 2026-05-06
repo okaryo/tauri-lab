@@ -86,6 +86,31 @@ button:hover {
   color: #1f6f43;
 }
 
+.greeting p {
+  color: inherit;
+}
+
+.greeting dl {
+  display: flex;
+  gap: 16px;
+  margin: 12px 0 0;
+}
+
+.greeting div {
+  display: grid;
+  gap: 4px;
+}
+
+.greeting dt {
+  color: #4d545c;
+  font-size: 13px;
+}
+
+.greeting dd {
+  margin: 0;
+  color: #202124;
+}
+
 .error {
   margin-top: 20px;
   font-weight: 700;

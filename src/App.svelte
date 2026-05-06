@@ -1,16 +1,21 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
 
+  type Greeting = {
+    message: string;
+    nameLength: number;
+  };
+
   let name = "";
-  let greeting = "";
+  let greeting: Greeting | null = null;
   let errorMessage = "";
 
   async function greet() {
-    greeting = "";
+    greeting = null;
     errorMessage = "";
 
     try {
-      greeting = await invoke<string>("greet", { name });
+      greeting = await invoke<Greeting>("greet", { name });
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error);
     }
@@ -32,7 +37,15 @@
   </form>
 
   {#if greeting}
-    <p class="greeting">{greeting}</p>
+    <section class="greeting" aria-label="Greeting from Rust">
+      <p>{greeting.message}</p>
+      <dl>
+        <div>
+          <dt>Name length</dt>
+          <dd>{greeting.nameLength}</dd>
+        </div>
+      </dl>
+    </section>
   {/if}
 
   {#if errorMessage}
