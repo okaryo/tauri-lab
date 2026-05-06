@@ -1,6 +1,12 @@
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {name}! You've been greeted from Rust.")
+fn greet(name: &str) -> Result<String, String> {
+    let name = name.trim();
+
+    if name.is_empty() {
+        return Err("Name is required.".to_string());
+    }
+
+    Ok(format!("Hello, {name}! You've been greeted from Rust."))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -85,3 +85,9 @@ button:hover {
   font-weight: 700;
   color: #1f6f43;
 }
+
+.error {
+  margin-top: 20px;
+  font-weight: 700;
+  color: #a33a2a;
+}

@@ -3,9 +3,17 @@
 
   let name = "";
   let greeting = "";
+  let errorMessage = "";
 
   async function greet() {
-    greeting = await invoke<string>("greet", { name });
+    greeting = "";
+    errorMessage = "";
+
+    try {
+      greeting = await invoke<string>("greet", { name });
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error);
+    }
   }
 </script>
 
@@ -25,5 +33,9 @@
 
   {#if greeting}
     <p class="greeting">{greeting}</p>
+  {/if}
+
+  {#if errorMessage}
+    <p class="error">{errorMessage}</p>
   {/if}
 </main>
