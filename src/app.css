@@ -86,6 +86,21 @@ button:hover {
   background: #1d515b;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+button.secondary {
+  padding: 8px 10px;
+  background: #e8e1d7;
+  color: #202124;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #d8d0c4;
+}
+
 .greeting {
   margin-top: 20px;
   font-weight: 700;
@@ -146,6 +161,17 @@ button:hover {
   border-radius: 6px;
   padding: 10px 12px;
   background: #fffdfa;
+}
+
+.todo-list li.completed span {
+  color: #687078;
+  text-decoration: line-through;
+}
+
+.todo-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .todo-list small {

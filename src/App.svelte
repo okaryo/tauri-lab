@@ -56,6 +56,17 @@
       todoErrorMessage = error instanceof Error ? error.message : String(error);
     }
   }
+
+  async function completeTodo(id: number) {
+    todoErrorMessage = "";
+
+    try {
+      const completedTodo = await invoke<Todo>("complete_todo", { id });
+      todos = todos.map((todo) => (todo.id === id ? completedTodo : todo));
+    } catch (error) {
+      todoErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
 </script>
 
 <main class="container">
@@ -106,9 +117,19 @@
     {#if todos.length > 0}
       <ul class="todo-list">
         {#each todos as todo (todo.id)}
-          <li>
+          <li class:completed={todo.completed}>
             <span>{todo.title}</span>
-            <small>#{todo.id}</small>
+            <div class="todo-actions">
+              <small>#{todo.id}</small>
+              <button
+                type="button"
+                class="secondary"
+                disabled={todo.completed}
+                on:click={() => completeTodo(todo.id)}
+              >
+                {todo.completed ? "Done" : "Complete"}
+              </button>
+            </div>
           </li>
         {/each}
       </ul>

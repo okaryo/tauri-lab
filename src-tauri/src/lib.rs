@@ -78,11 +78,34 @@ fn list_todos(state: State<'_, AppState>) -> Result<Vec<Todo>, String> {
     Ok(store.todos.clone())
 }
 
+#[tauri::command]
+fn complete_todo(id: u32, state: State<'_, AppState>) -> Result<Todo, String> {
+    let mut store = state
+        .todo_store
+        .lock()
+        .map_err(|_| "Todo store lock is poisoned.".to_string())?;
+
+    let todo = store
+        .todos
+        .iter_mut()
+        .find(|todo| todo.id == id)
+        .ok_or_else(|| format!("Todo #{id} was not found."))?;
+
+    todo.completed = true;
+
+    Ok(todo.clone())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
-        .invoke_handler(tauri::generate_handler![greet, create_todo, list_todos])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            create_todo,
+            list_todos,
+            complete_todo
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
