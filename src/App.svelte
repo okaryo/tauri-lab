@@ -5,7 +5,8 @@
     requestPermission,
     sendNotification,
   } from "@tauri-apps/plugin-notification";
-  import { onMount } from "svelte";
+  import { isRegistered, register, unregister } from "@tauri-apps/plugin-global-shortcut";
+  import { onDestroy, onMount } from "svelte";
 
   type Todo = {
     id: number;
@@ -27,10 +28,21 @@
   let workLogErrorMessage = "";
   let notificationStatus = "Not checked";
   let notificationErrorMessage = "";
+  const workLogShortcut = "CommandOrControl+Shift+L";
+  let shortcutRegistered = false;
+  let shortcutTriggerCount = 0;
+  let shortcutStatus = "Not registered";
+  let shortcutErrorMessage = "";
 
   onMount(() => {
     void loadTodos();
     void loadWorkLogs();
+  });
+
+  onDestroy(() => {
+    if (shortcutRegistered) {
+      void unregister(workLogShortcut);
+    }
   });
 
   async function loadTodos() {
@@ -120,6 +132,46 @@
       notificationErrorMessage = error instanceof Error ? error.message : String(error);
     }
   }
+
+  async function registerWorkLogShortcut() {
+    shortcutErrorMessage = "";
+
+    try {
+      if (await isRegistered(workLogShortcut)) {
+        shortcutRegistered = true;
+        shortcutStatus = "Registered";
+        return;
+      }
+
+      await register(workLogShortcut, (event) => {
+        if (event.state !== "Pressed") {
+          return;
+        }
+
+        shortcutTriggerCount += 1;
+        shortcutStatus = `Triggered ${shortcutTriggerCount} time${
+          shortcutTriggerCount === 1 ? "" : "s"
+        }`;
+      });
+
+      shortcutRegistered = true;
+      shortcutStatus = "Registered";
+    } catch (error) {
+      shortcutErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function unregisterWorkLogShortcut() {
+    shortcutErrorMessage = "";
+
+    try {
+      await unregister(workLogShortcut);
+      shortcutRegistered = false;
+      shortcutStatus = "Not registered";
+    } catch (error) {
+      shortcutErrorMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
 </script>
 
 <main class="container">
@@ -206,6 +258,29 @@
 
     {#if notificationErrorMessage}
       <p class="error">{notificationErrorMessage}</p>
+    {/if}
+  </section>
+
+  <section class="shortcut-section" aria-labelledby="shortcut-heading">
+    <h2 id="shortcut-heading">Global Shortcut</h2>
+    <p>Shortcut: {workLogShortcut}</p>
+    <p>Status: {shortcutStatus}</p>
+    <div class="button-row">
+      <button type="button" on:click={registerWorkLogShortcut} disabled={shortcutRegistered}>
+        Register
+      </button>
+      <button
+        type="button"
+        class="secondary"
+        on:click={unregisterWorkLogShortcut}
+        disabled={!shortcutRegistered}
+      >
+        Unregister
+      </button>
+    </div>
+
+    {#if shortcutErrorMessage}
+      <p class="error">{shortcutErrorMessage}</p>
     {/if}
   </section>
 </main>

@@ -121,17 +121,26 @@ button.secondary:hover:not(:disabled) {
 
 .todo-section,
 .work-log-section,
-.notification-section {
+.notification-section,
+.shortcut-section {
   margin-top: 40px;
 }
 
-.notification-section {
+.notification-section,
+.shortcut-section {
   display: grid;
   gap: 12px;
 }
 
-.notification-section button {
+.notification-section button,
+.shortcut-section button {
   justify-self: start;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .todo-list,

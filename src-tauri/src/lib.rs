@@ -225,6 +225,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
+
             if let Err(error) = init_database(app.handle()) {
                 eprintln!("Failed to initialize database: {error}");
             }
