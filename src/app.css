@@ -37,12 +37,18 @@ h1 {
   line-height: 1.1;
 }
 
+h2 {
+  margin: 0 0 16px;
+  font-size: 24px;
+}
+
 p {
   margin: 0;
   color: #4d545c;
 }
 
-.greet-form {
+.greet-form,
+.todo-form {
   display: grid;
   gap: 10px;
 }
@@ -115,4 +121,37 @@ button:hover {
   margin-top: 20px;
   font-weight: 700;
   color: #a33a2a;
+}
+
+.todo-section {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid #d8d0c4;
+}
+
+.todo-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 20px 0 0;
+  list-style: none;
+}
+
+.todo-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d8d0c4;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fffdfa;
+}
+
+.todo-list small {
+  color: #687078;
+}
+
+.empty {
+  margin-top: 20px;
 }
