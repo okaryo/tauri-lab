@@ -18,6 +18,12 @@
     workLogShortcut,
   } from "./lib/desktop/globalShortcuts";
 
+  const workDurationSeconds = 25 * 60;
+  const breakDurationSeconds = 5 * 60;
+
+  type PomodoroMode = "work" | "break";
+  type TimerStatus = "idle" | "running" | "paused";
+
   let todoTitle = "";
   let todos: Todo[] = [];
   let todoErrorMessage = "";
@@ -30,6 +36,10 @@
   let shortcutTriggerCount = 0;
   let shortcutStatus = "Not registered";
   let shortcutErrorMessage = "";
+  let pomodoroMode: PomodoroMode = "work";
+  let timerStatus: TimerStatus = "idle";
+  let remainingSeconds = workDurationSeconds;
+  let timerId: ReturnType<typeof setInterval> | null = null;
 
   onMount(() => {
     void loadTodos();
@@ -40,7 +50,14 @@
     if (shortcutRegistered) {
       void unregisterWorkLogShortcutCommand();
     }
+
+    stopTimer();
   });
+
+  $: timerProgress =
+    1 -
+    remainingSeconds /
+      (pomodoroMode === "work" ? workDurationSeconds : breakDurationSeconds);
 
   async function loadTodos() {
     todoErrorMessage = "";
@@ -142,6 +159,54 @@
       shortcutErrorMessage = error instanceof Error ? error.message : String(error);
     }
   }
+
+  function startTimer() {
+    if (timerStatus === "running") {
+      return;
+    }
+
+    timerStatus = "running";
+    timerId = setInterval(tickTimer, 1000);
+  }
+
+  function pauseTimer() {
+    stopTimer();
+    timerStatus = "paused";
+  }
+
+  function resetTimer() {
+    stopTimer();
+    timerStatus = "idle";
+    pomodoroMode = "work";
+    remainingSeconds = workDurationSeconds;
+  }
+
+  function stopTimer() {
+    if (timerId === null) {
+      return;
+    }
+
+    clearInterval(timerId);
+    timerId = null;
+  }
+
+  function tickTimer() {
+    if (remainingSeconds > 1) {
+      remainingSeconds -= 1;
+      return;
+    }
+
+    const nextMode: PomodoroMode = pomodoroMode === "work" ? "break" : "work";
+    pomodoroMode = nextMode;
+    remainingSeconds = nextMode === "work" ? workDurationSeconds : breakDurationSeconds;
+  }
+
+  function formatDuration(totalSeconds: number) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
 </script>
 
 <main class="container">
@@ -187,6 +252,35 @@
     {:else}
       <p class="empty">No todos yet.</p>
     {/if}
+  </section>
+
+  <section class="pomodoro-section" aria-labelledby="pomodoro-heading">
+    <h2 id="pomodoro-heading">Pomodoro</h2>
+    <div class="timer-panel">
+      <p class="timer-mode">{pomodoroMode === "work" ? "Work" : "Break"}</p>
+      <p class="timer-display">{formatDuration(remainingSeconds)}</p>
+      <progress
+        class="timer-progress"
+        value={timerProgress}
+        max="1"
+        aria-label="Pomodoro progress"
+      ></progress>
+      <div class="button-row">
+        <button type="button" on:click={startTimer} disabled={timerStatus === "running"}>
+          Start
+        </button>
+        <button
+          type="button"
+          class="secondary"
+          on:click={pauseTimer}
+          disabled={timerStatus !== "running"}
+        >
+          Pause
+        </button>
+        <button type="button" class="secondary" on:click={resetTimer}>Reset</button>
+      </div>
+      <small>Status: {timerStatus}</small>
+    </div>
   </section>
 
   <section class="work-log-section" aria-labelledby="work-log-heading">
