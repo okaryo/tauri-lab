@@ -1,9 +1,11 @@
-use rusqlite::{params, Connection};
+mod db;
+
+use db::{open_database, settings_path};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,81 +39,6 @@ impl Default for AppSettings {
             timer_notifications_enabled: true,
         }
     }
-}
-
-fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Failed to resolve app data directory: {error}"))?;
-
-    fs::create_dir_all(&app_data_dir)
-        .map_err(|error| format!("Failed to create app data directory: {error}"))?;
-
-    Ok(app_data_dir)
-}
-
-fn database_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app_data_dir(app)?.join("data.sqlite"))
-}
-
-fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app_data_dir(app)?.join("settings.json"))
-}
-
-fn open_database(app: &AppHandle) -> Result<Connection, String> {
-    let path = database_path(app)?;
-
-    Connection::open(path).map_err(|error| format!("Failed to open database: {error}"))
-}
-
-fn init_database(app: &AppHandle) -> Result<(), String> {
-    let mut connection = open_database(app)?;
-    let version = current_schema_version(&connection)?;
-
-    if version < 1 {
-        migrate_to_v1(&mut connection)?;
-    }
-
-    Ok(())
-}
-
-fn current_schema_version(connection: &Connection) -> Result<u32, String> {
-    connection
-        .query_row("PRAGMA user_version", [], |row| row.get(0))
-        .map_err(|error| format!("Failed to read schema version: {error}"))
-}
-
-fn migrate_to_v1(connection: &mut Connection) -> Result<(), String> {
-    let transaction = connection
-        .transaction()
-        .map_err(|error| format!("Failed to start migration v1: {error}"))?;
-
-    transaction
-        .execute_batch(
-            "
-            CREATE TABLE IF NOT EXISTS todos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                completed INTEGER NOT NULL DEFAULT 0
-            );
-
-            CREATE TABLE IF NOT EXISTS work_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                body TEXT NOT NULL,
-                created_at_ms INTEGER NOT NULL
-            );
-
-            PRAGMA user_version = 1;
-            ",
-        )
-        .map_err(|error| format!("Failed to apply migration v1: {error}"))?;
-
-    transaction
-        .commit()
-        .map_err(|error| format!("Failed to commit migration v1: {error}"))?;
-
-    Ok(())
 }
 
 fn row_id_to_u32(row_id: i64) -> Result<u32, String> {
@@ -295,7 +222,7 @@ pub fn run() {
             app.handle()
                 .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
 
-            if let Err(error) = init_database(app.handle()) {
+            if let Err(error) = db::init_database(app.handle()) {
                 eprintln!("Failed to initialize database: {error}");
             }
 

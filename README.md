@@ -106,16 +106,29 @@ Tauri v2 では、フロントエンドから使える機能を capabilities で
   - [x] mp3 アセットから環境音を再生する
   - [x] 環境音の再生・停止 UI を作る
   - [x] ポモドーロタイマーと連動する
-- [ ] アプリやブラウザ URL 制限の実現方法を調査する
+- [x] アプリやブラウザ URL 制限の実現方法を調査する
 
 アプリやブラウザ URL の制限は OS やブラウザごとの差が大きく、権限や配布時の説明も重くなります。
 この練習用アプリでは、まずは調査と小さな検証に留め、実際のブロック機能を急いで作り込まない方針です。
+
+### Phase 6: DB / migration 整理
+
+- [x] Rust 側の DB 初期化処理を整理する
+- [x] migration SQL を `src-tauri/migrations/*.sql` で管理する
+- [x] migration 実行後の schema を `src-tauri/schema.sql` に出力する
+- [x] `setup()` から DB 初期化の詳細を分離する
+
+このフェーズは、本番アプリに進む前の仕上げとして扱います。
+現在は Rust コード内の文字列で migration を管理していますが、SQL ファイルへ切り出すことで差分を追いやすくし、`schema.sql` で現在の DB 全体像を確認できるようにします。
 
 ## 構成
 
 - `src/`: Svelte で書くフロントエンド
 - `src-tauri/`: Rust で書く Tauri アプリケーション本体
 - `src-tauri/src/lib.rs`: フロントエンドから呼び出す Rust コマンド
+- `src-tauri/src/db.rs`: SQLite の初期化、migration 実行、schema 出力
+- `src-tauri/migrations/`: SQLite migration SQL
+- `src-tauri/schema.sql`: migration 適用後の schema
 - `src-tauri/tauri.conf.json`: ウィンドウ、ビルド、アプリ識別子などの Tauri 設定
 - `src-tauri/capabilities/`: フロントエンドに許可する Tauri 権限の設定
 
